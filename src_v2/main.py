@@ -2,35 +2,25 @@ import time
 from datetime import datetime, timedelta
 import pandas as pd
 import numpy as np
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from trading_functions import TradingFunctions
 from data_ingestion import DataIngestion
 from model import Classifier
 from trading_utils import TradingPrice
 from binance.client import Client
-from env import demo_futures_api, demo_futures_secret, test_net
+from env import demo_futures_api, demo_futures_secret, test_net, max_funding_rate_threshold, edge_threshold_small
 
-# Configuration
-TOP_10_CRYPTOS = [
-    "BTCUSDT",  # Bitcoin
-    "ETHUSDT",  # Ethereum
-    "BNBUSDT",  # Binance Coin
-    "XRPUSDT",  # XRP
-    "SOLUSDT",  # Solana
-    "DOGEUSDT", # Dogecoin
-    "ADAUSDT",  # Cardano
-    "MATICUSDT",# Polygon (Note: Use POLUSDT if MATIC is deprecated, but mostly MATICUSDT exists)
-    "DOTUSDT",  # Polkadot
-    "AVAXUSDT"  # Avalanche
+# Configuration - Full List
+TRADING_SYMBOLS = [
+    "BTCUSDT", "ETHUSDT", "BNBUSDT", "XRPUSDT", "ADAUSDT", 
+    "SOLUSDT", "DOGEUSDT", "MATICUSDT", "DOTUSDT", "AVAXUSDT",
+    "LTCUSDT", "LINKUSDT", "ATOMUSDT", "ETCUSDT", "UNIUSDT"
 ]
 
 def get_next_candle_time():
     """Calculates the next 4H candle close time."""
     now = datetime.utcnow()
     # 4H candles close at 0, 4, 8, 12, 16, 20
-    # We want the *next* boundary. 
-    # If now is 04:00:00 -> Next is 08:00
-    # If now is 03:59:59 -> Next is 04:00
-    
     next_hour = ((now.hour // 4) + 1) * 4
     if next_hour >= 24:
         target = now.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
@@ -38,30 +28,39 @@ def get_next_candle_time():
         target = now.replace(hour=next_hour, minute=0, second=0, microsecond=0)
     return target
 
-def wait_for_next_candle():
-    """Sleeps until the next 4H candle close (with buffer)."""
+def wait_for_next_candle(trading):
+    """
+    Sleeps until the next 4H candle close (with buffer), 
+    while periodically checking positions to move SL if TP1 is hit.
+    """
     target = get_next_candle_time()
-    now = datetime.utcnow()
+    buffer_seconds = 120
+    target_time_buffered = target + timedelta(seconds=buffer_seconds)
     
-    sleep_seconds = (target - now).total_seconds()
+    print(f"Next 4H candle closes at {target} UTC. Entering monitoring loop until {target_time_buffered} UTC.")
     
-    # Add buffer (e.g., 2 mins) to ensure Binance has finalized the candle
-    buffer_seconds = 120 
-    total_sleep = sleep_seconds + buffer_seconds
-    
-    if total_sleep < 0:
-        # Should rarely happen with the logic above, but safety first
-        total_sleep = 0
+    while datetime.utcnow() < target_time_buffered:
+        # Sleep interval (e.g., 60s)
+        time.sleep(60)
         
-    print(f"Next 4H candle closes at {target} UTC. Sleeping for {total_sleep/60:.2f} minutes.")
-    time.sleep(total_sleep)
+        # MONITORING TASK
+        try:
+            # 1. Get all active positions efficiently
+            all_positions = trading.client.futures_position_information()
+            active_symbols = [
+                p['symbol'] for p in all_positions 
+                if float(p['positionAmt']) != 0 and p['symbol'] in TRADING_SYMBOLS
+            ]
+            
+            if active_symbols:
+                # print(f"Monitoring {len(active_symbols)} active positions...")
+                for sym in active_symbols:
+                    trading.check_and_move_sl_to_be(sym)
+                    
+        except Exception as e:
+            print(f"Error in monitoring loop: {e}")
 
-def is_within_trading_window(minutes_tolerance=15):
-    """
-    Checks if the current time is within 'minutes_tolerance' AFTER a 4H candle close.
-    Example: If tolerance is 15, valid times are 00:00-00:15, 04:00-04:15, etc.
-    This prevents the bot from executing 'stale' trades if started in the middle of a session.
-    """
+def is_within_trading_window(minutes_tolerance=30):
     now = datetime.utcnow()
     # Check if we are in the first X minutes of a 4-hour block
     if now.hour % 4 == 0 and now.minute < minutes_tolerance:
@@ -69,22 +68,72 @@ def is_within_trading_window(minutes_tolerance=15):
     return False
 
 def get_total_usdt_capital(trading):
-    """Calculates total available USDT equity."""
     try:
         balance_info = trading.get_balance()
         for asset in balance_info:
             if asset['asset'] == 'USDT':
-                # Use balance + crossUnPnl for approximate equity
-                # Note: 'balance' is wallet balance. 'crossUnPnl' is unrealized PnL.
                 return float(asset['balance'])
     except Exception as e:
         print(f"Error fetching balance: {e}")
-    return 1000.0 # Fallback default
+    return 1000.0 
+
+def analyze_symbol(symbol, data_ingestion, model, trading_price, trading, max_funding_rate_threshold):
+    """Run analysis for a single symbol. Returns dict or None."""
+    try:
+        # 1. Get Data
+        df = data_ingestion.get_data(symbol)
+        if df.empty: 
+            return None
+
+        # 2. Engineer Features
+        df_features = data_ingestion.__engineer_features__(df)
+        if df_features.empty:
+            return None
+
+        # 3. Predict
+        probs = model.predict(df_features)
+        
+        # 4. Edge & Decision
+        edge = trading_price.calculate_edge(probs)
+        print(f"Symbol: {symbol}, Edge: {edge:.4f}")
+        side, leverage, desc = trading_price.get_trade_decision(edge)
+        # Funding rate Check
+        funding_rate = trading.get_funding_rate(symbol)
+        limit_val = max_funding_rate_threshold / 100.0
+        
+        if side == "BUY" and funding_rate > limit_val:
+            side = "NEUTRAL"
+            desc = "Filtered (High Funding)"
+        elif side == "SELL" and funding_rate < -limit_val:
+            side = "NEUTRAL"
+            desc = "Filtered (Low Funding)"
+        
+        volatility = df_features.iloc[-1]['vol_20']
+        atr = df_features.iloc[-1]['atr_14']
+        
+        return {
+            'symbol': symbol,
+            'side': side,
+            'leverage': leverage,
+            'desc': desc,
+            'volatility': volatility,
+            'edge': edge,
+            'atr': atr,
+            'funding': funding_rate
+        }
+    except Exception as e:
+        # print(f"Error analyzing {symbol}: {e}") # Reduce noise
+        return None
 
 def main():
-    print("Starting CryptoV2 Bot with Portfolio Trading...")
+    print("Starting CryptoV2 Bot with Portfolio Trading (200 Symbol Scan)...")
     
-    # Initialize components
+    # Log active environment
+    if test_net:
+        print(f"ENVIRONMENT: TESTNET (Key: {demo_futures_api[:5]}...)")
+    else:
+        print(f"ENVIRONMENT: MAINNET (Key: {demo_futures_api[:5]}...)")
+
     client = Client(demo_futures_api, demo_futures_secret, testnet=test_net)
     trading = TradingFunctions(client)
     data_ingestion = DataIngestion()
@@ -95,145 +144,202 @@ def main():
         try:
             print(f"\n--- Analysis cycle check at {datetime.utcnow()} ---")
             
-            # Check if we are inside the valid execution window
-            if not is_within_trading_window(minutes_tolerance=30):
-                print("Outside of 30-minute post-close trading window. Skipping trade execution to prevent stale signals.")
-                wait_for_next_candle()
-                continue # Restart loop, which triggers valid timestamps check
+            # 0. Routine Cleanup
+            trading.cleanup_orphan_orders()
             
-            # Phase 1: Data Gathering & Prediction
-            analysis_results = {}
-            total_inverse_volilaty = 0
+            if not is_within_trading_window(minutes_tolerance=45): # Increased for 200 items scan
+                print("Outside of 45-minute post-close trading window.")
+                wait_for_next_candle(trading)
+                continue 
             
-            print("Analyzing portfolio...")
-            # Double check time again to ensure 'is_within' didn't pass us at minute 29 and we take 5 mins to run
-            # but that's fine, as long as we STARTED freshness check.
-            
+            print("Fetching current positions...")
+            try:
+                # Efficiently get all positions once
+                all_positions_raw = trading.client.futures_position_information()
+                current_positions = {p['symbol']: float(p['positionAmt']) for p in all_positions_raw if float(p['positionAmt']) != 0}
+                print(f"Open Positions: {list(current_positions.keys())}")
+            except Exception as e:
+                print(f"Error fetching open positions: {e}")
+                current_positions = {}
+
             current_capital = get_total_usdt_capital(trading)
             print(f"Total USDT Capital: {current_capital}")
-
-            # Safe usage fraction (e.g. use 90% of capital across all trades to leave buffer)
+            
+            # Using 90% capital, distributed among active trades
             deployable_capital = current_capital * 0.90 
 
-            for symbol in TOP_10_CRYPTOS:
-                try:
-                    # 1. Get Data
-                    df = data_ingestion.get_data(symbol)
-                    if df.empty: 
-                        print(f"Skipping {symbol}: No data found")
-                        continue
-
-                    # 2. Engineer Features
-                    df_features = data_ingestion.__engineer_features__(df)
-                    
-                    if df_features.empty:
-                        print(f"Skipping {symbol}: Feature engineering returned empty")
-                        continue
-
-                    # 3. Predict
-                    probs = model.predict(df_features)
-                    
-                    # 4. Edge & Decision
-                    edge = trading_price.calculate_edge(probs)
-                    side, leverage, desc = trading_price.get_trade_decision(edge)
-
-                    # 5. Volatility for Weighting
-                    # Use the last calculated volatility. 
-                    # If df_features has 'vol_20', we use that.
-                    # It matches the prediction row.
-                    volatility = df_features.iloc[-1]['vol_20']
-                    
-                    # Capture ATR for strategic orders
-                    atr = df_features.iloc[-1]['atr_14']
-                    
-                    # Store results
-                    analysis_results[symbol] = {
-                        'side': side,
-                        'leverage': leverage,
-                        'desc': desc,
-                        'volatility': volatility,
-                        'edge': edge,
-                        'atr': atr
-                    }
-                    
-                    # Accumulate inverse volatility (Handle 0 vol case)
-                    if volatility > 0:
-                        total_inverse_volilaty += (1.0 / volatility)
-                    
-                    print(f"{symbol}: {side} ({desc}) | Edge: {edge:.4f} | Vol: {volatility:.4f}")
-
-                except Exception as e:
-                    print(f"Error analyzing {symbol}: {e}")
-                    continue
+            print(f"Analyzing {len(TRADING_SYMBOLS)} symbols...")
+            candidates = []
             
-            # Phase 2: Weighting & Execution
-            if total_inverse_volilaty == 0:
-                print("Total inverse volatility is 0, falling back to Equal Weighting")
-                # Avoid division by zero
-                total_inverse_volilaty = 1 # Dummy value, logic handled in loop
+            # Use ThreadPool for Analysis (I/O bound)
+            with ThreadPoolExecutor(max_workers=10) as executor:
+                futures = {
+                    executor.submit(analyze_symbol, s, data_ingestion, model, trading_price, trading, max_funding_rate_threshold): s 
+                    for s in TRADING_SYMBOLS
+                }
+                
+                count = 0
+                for future in as_completed(futures):
+                    count += 1
+                    if count % 20 == 0:
+                        print(f"Processed {count}/{len(TRADING_SYMBOLS)}")
+                        
+                    res = future.result()
+                    if res:
+                        candidates.append(res)
             
+            # --- HYSTERESIS LOGIC (Stop the Bleeding) ---
+            # If we hold a position and the edge has decayed but is still weakly in our favor, 
+            # upgradethe status to BUY/SELL to prevent closing (Hold).
+            # Threshold: 50% of the normal entry threshold.
+            
+            # Uses edge_threshold_small from env.py (default 0.05)
+            # weak_threshold becomes 0.025
+            weak_threshold = edge_threshold_small * 0.5 
+            
+            for c in candidates:
+                sym = c['symbol']
+                current_qty = current_positions.get(sym, 0)
+                
+                # If we are Long and signal is Neutral (but edge still positive > weak_threshold)
+                if current_qty > 0 and c['side'] == 'NEUTRAL' and c['edge'] > weak_threshold:
+                    c['side'] = 'BUY'
+                    c['desc'] = f"Hold (Weak Edge {c['edge']:.3f})"
+                    print(f"  >> HYSTERESIS: Keeping {sym} LONG (Edge {c['edge']:.3f} > {weak_threshold})")
+                
+                # If we are Short and signal is Neutral (but edge still negative < -weak_threshold)
+                elif current_qty < 0 and c['side'] == 'NEUTRAL' and c['edge'] < -weak_threshold:
+                    c['side'] = 'SELL'
+                    c['desc'] = f"Hold (Weak Edge {c['edge']:.3f})"
+                    print(f"  >> HYSTERESIS: Keeping {sym} SHORT (Edge {c['edge']:.3f} < {-weak_threshold})")
+
+            # Filtering and Selection
+            long_candidates = [c for c in candidates if c['side'] == 'BUY']
+            short_candidates = [c for c in candidates if c['side'] == 'SELL']
+            
+            # Sort by absolute Edge strength (for logging purposes)
+            long_candidates.sort(key=lambda x: x['edge'], reverse=True)
+            short_candidates.sort(key=lambda x: x['edge'])
+            
+            # User request: Trade these 15 symbols specifically. 
+            # We treat all valid signals as portfolio candidates to avoid "rank churn".
+            # If a symbol has an edge, we trade/hold it.
+            selected_portfolio = long_candidates + short_candidates
+            selected_symbols = set(c['symbol'] for c in selected_portfolio)
+            
+            print(f"\nSelected Portfolio ({len(selected_portfolio)} assets):")
+            for c in selected_portfolio:
+                print(f"  {c['symbol']} ({c['side']}): Edge {c['edge']:.4f}")
+
+            # Prepare Execution Plan
+            final_execution_list = []
+            
+            # 1. Close unselected positions (Strictly those with NO valid edge/Neutral)
+            for symbol in current_positions:
+                if symbol not in selected_symbols:
+                    final_execution_list.append({
+                        'symbol': symbol,
+                        'side': 'NEUTRAL',
+                        'action': 'CLOSE',
+                        'desc': 'Rebalancing (No Edge)'
+                    })
+            
+            # 2. Open/Update selected positions
+            total_inverse_volilaty = 0
+            for c in selected_portfolio:
+                if c['volatility'] > 0:
+                    total_inverse_volilaty += (1.0 / c['volatility'])
+            
+            if total_inverse_volilaty == 0: total_inverse_volilaty = 1
+
+            for c in selected_portfolio:
+                # Calculate Weight
+                if total_inverse_volilaty > 1 and c['volatility'] > 0:
+                    weight = (1.0 / c['volatility']) / total_inverse_volilaty
+                else:
+                    weight = 1.0 / len(selected_portfolio) if selected_portfolio else 0
+                
+                # Apply leverage to the capital allocation
+                allocated_margin = deployable_capital * weight
+                size_usdt = max(6, allocated_margin * c['leverage'])
+                
+                final_execution_list.append({
+                    'symbol': c['symbol'],
+                    'side': c['side'],
+                    'leverage': c['leverage'],
+                    'amount': size_usdt ,
+                    'atr': c['atr'],
+                    'edge': c['edge'],
+                    'action': 'OPEN',
+                    'desc': f"Edge {c['edge']:.2f}"
+                })
+
             print("\nExecuting Trades...")
-            for symbol, result in analysis_results.items():
+            
+            def execute_single_task(task):
+                sym = task['symbol']
                 try:
-                    side = result['side']
-                    leverage = result['leverage']
-                    volatility = result['volatility']
-
-                    # Weighting Algorithm: Inverse Volatility
-                    if total_inverse_volilaty > 1 and volatility > 0:
-                        weight = (1.0 / volatility) / total_inverse_volilaty
-                    else:
-                        weight = 1.0 / len(analysis_results) # Fallback Equal Weight
-
-                    position_size_usdt = deployable_capital * weight
-                    
-                    # Min trade size check (Binance min is usually 5-10 USDT)
-                    if position_size_usdt < 6: 
-                        position_size_usdt = 6
-
-                    print(f"--> {symbol}: Weight {weight:.2%} -> Size ${position_size_usdt:.2f}")
-
-                    current_position = trading.get_current_position(symbol)
-                    
-                    if side == "NEUTRAL":
-                        if current_position != 0:
-                            print(f"    Closing {symbol} (NEUTRAL)")
-                            trading.close_position(symbol)
-                        else:
-                            print(f"    {symbol} Flat.")
-                    else:
-                        # Re-balancing logic:
-                        # Close existing if direction is wrong OR if size difference is substantial?
-                        # For simplicity/robustness: Close & Re-open to match exact size/leverage
-                        if current_position != 0:
-                            print(f"    Closing existing {symbol} to re-balance/re-enter.")
-                            trading.close_position(symbol)
+                    if task['action'] == 'CLOSE':
+                        print(f"--> CLOSING {sym} (No Edge)")
+                        trading.close_position(sym)
+                    elif task['action'] == 'OPEN':
+                        # Check current pos
+                        curr = current_positions.get(sym, 0)
+                        side = task['side']
+                        target_size = task['amount']
+                        leverage = task['leverage']
+                        atr = task['atr']
+                        curr_edge = task['edge']
                         
-                        print(f"    Opening {side} {symbol}...")
-                        # Get ATR from df_features for this symbol
-                        # Note: We calculated df_features earlier but stored it inside the loop. 
-                        # We need to retrieve it or store it in analyis_results.
-                        # We stored 'volatility' (which is std dev), but not ATR.
-                        # Let's fix gathering block above to store ATR.
-                        atr = result.get('atr', 0)
+                        # SMART EXECUTION LOGIC to minimize fees
                         
+                        # 1. If Position matches Side -> HOLD
+                        # Optimization: We check if strict direction matches.
+                        # Even if edge strength changed (e.g. Small Edge -> Large Edge), we do NOT close & reopen 
+                        # just to change leverage. We hold the existing position to strictly minimize fees.
+                        if (side == 'BUY' and curr > 0) or (side == 'SELL' and curr < 0):
+                            print(f"--> HOLDING {sym} (Existing {side} position matches signal). Ignoring leverage/size updates.")
+                            return
+
+                        # 2. If Position Flip -> Close and Open
+                        if (side == 'BUY' and curr < 0) or (side == 'SELL' and curr > 0):
+                            print(f"--> FLIPPING {sym} (Close existing)")
+                            trading.close_position(sym)
+                            curr = 0
+                            
+                        # 3. If Rebalancing (only if we didn't return above)
+                        # The code above returns if side matches, so we only reach here if curr == 0
+                        # (because if curr != 0 and side matched, we returned. If side diff, we closed so curr=0)
+                        
+                        # Double check if any dust remains? 
+                        # Assuming close_position worked or curr was 0.
+
+                        print(f"--> OPENING {side} {sym} Size ${target_size:.2f}")
                         trading.place_strategic_order(
-                            symbol=symbol,
+                            symbol=sym,
                             side=side,
-                            amount=position_size_usdt,
+                            amount=target_size,
                             leverage=leverage,
-                            atr=atr
+                            atr=atr,
+                            edge=curr_edge # Pass Edge for TP Banding
                         )
-
                 except Exception as e:
-                    print(f"Error executing trade for {symbol}: {e}")
+                    print(f"Error executing {sym}: {e}")
+
+            # Execute in parallel (limit workers)
+            with ThreadPoolExecutor(max_workers=5) as executor:
+                futures = [executor.submit(execute_single_task, task) for task in final_execution_list]
+                for f in as_completed(futures):
+                    try: 
+                        f.result() 
+                    except Exception as e: 
+                        print(f"Exec Error: {e}")
 
             print("Cycle complete.")
-            wait_for_next_candle()
+            wait_for_next_candle(trading)
             
         except Exception as e:
             print(f"CRITICAL ERROR in main loop: {e}")
-            print("Sleeping for 1 minute before retrying...")
             time.sleep(60)
 
 if __name__ == "__main__":

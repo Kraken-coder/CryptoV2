@@ -1,0 +1,2 @@
+nohup: ignoring input
+python3: can't open file '/home/ec2-user/CryptoV2/src_v2/src_v2/main.py': [Errno 2] No such file or directory

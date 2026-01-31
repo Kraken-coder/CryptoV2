@@ -1,0 +1,313 @@
+nohup: ignoring input
+Starting CryptoV2 Bot with Portfolio Trading (200 Symbol Scan)...
+ENVIRONMENT: MAINNET (Key: IjK8t...)
+Syncing state with Binance...
+Error syncing order 117973870: APIError(code=-2013): Order does not exist.
+Error syncing order 155813789: APIError(code=-2013): Order does not exist.
+Error syncing order 554394240: APIError(code=-2013): Order does not exist.
+Error syncing order 554591289: APIError(code=-2013): Order does not exist.
+Error syncing order 554593632: APIError(code=-2013): Order does not exist.
+Error syncing order 558533445: APIError(code=-2013): Order does not exist.
+Error syncing order 637108945: APIError(code=-2013): Order does not exist.
+Error syncing order 924194060: APIError(code=-2013): Order does not exist.
+Error syncing order 1174099637: APIError(code=-2013): Order does not exist.
+Error syncing order 1174566494: APIError(code=-2013): Order does not exist.
+Error syncing order 1345146458: APIError(code=-2013): Order does not exist.
+Error syncing order 1625577384: APIError(code=-2013): Order does not exist.
+Error syncing order 11836831280: APIError(code=-2013): Order does not exist.
+Error syncing order 11841209768: APIError(code=-2013): Order does not exist.
+Error syncing order 11875824097: APIError(code=-2013): Order does not exist.
+/home/ec2-user/.local/lib/python3.9/site-packages/sklearn/base.py:380: InconsistentVersionWarning: Trying to unpickle estimator DecisionTreeClassifier from version 1.7.2 when using version 1.6.1. This might lead to breaking code or invalid results. Use at your own risk. For more info please refer to:
+https://scikit-learn.org/stable/model_persistence.html#security-maintainability-limitations
+  warnings.warn(
+/home/ec2-user/.local/lib/python3.9/site-packages/sklearn/base.py:380: InconsistentVersionWarning: Trying to unpickle estimator RandomForestClassifier from version 1.7.2 when using version 1.6.1. This might lead to breaking code or invalid results. Use at your own risk. For more info please refer to:
+https://scikit-learn.org/stable/model_persistence.html#security-maintainability-limitations
+  warnings.warn(
+
+--- Analysis cycle check at 2026-01-29 19:23:59.306539 ---
+Checking for orphan orders (dangling TP/SL)...
+No orphan orders found.
+Outside of 45-minute post-close trading window.
+Next 4H candle closes at 2026-01-29 20:00:00 UTC. Entering monitoring loop until 2026-01-29 20:02:00 UTC.
+
+--- Analysis cycle check at 2026-01-29 20:02:06.097114 ---
+Checking for orphan orders (dangling TP/SL)...
+No orphan orders found.
+Fetching current positions...
+Open Positions: []
+Total USDT Capital: 51.82416785
+Analyzing 15 symbols...
+Symbol: AVAXUSDT, Edge: -0.2265
+Symbol: ETHUSDT, Edge: 0.2268Symbol: BNBUSDT, Edge: 0.1394
+
+Symbol: XRPUSDT, Edge: 0.1566
+Symbol: BTCUSDT, Edge: 0.0504
+Symbol: SOLUSDT, Edge: 0.1044
+Symbol: ADAUSDT, Edge: -0.1739
+Symbol: DOGEUSDT, Edge: 0.0295
+Symbol: DOTUSDT, Edge: -0.1231
+Symbol: LTCUSDT, Edge: 0.1347
+Symbol: LINKUSDT, Edge: 0.1184
+Symbol: ATOMUSDT, Edge: 0.0204
+Symbol: ETCUSDT, Edge: 0.2863
+Symbol: UNIUSDT, Edge: -0.1847
+
+Selected Portfolio (0 assets):
+
+Executing Trades...
+Cycle complete.
+Next 4H candle closes at 2026-01-30 00:00:00 UTC. Entering monitoring loop until 2026-01-30 00:02:00 UTC.
+
+--- Analysis cycle check at 2026-01-30 00:02:51.907179 ---
+Checking for orphan orders (dangling TP/SL)...
+No orphan orders found.
+Fetching current positions...
+Open Positions: []
+Total USDT Capital: 51.82416785
+Analyzing 15 symbols...
+Symbol: ADAUSDT, Edge: 0.1615
+Symbol: XRPUSDT, Edge: -0.0033
+Symbol: BNBUSDT, Edge: 0.1860
+Symbol: ETHUSDT, Edge: 0.1057
+Symbol: DOGEUSDT, Edge: 0.2128
+Symbol: SOLUSDT, Edge: -0.3916
+Symbol: DOTUSDT, Edge: -0.1430
+Symbol: AVAXUSDT, Edge: 0.0421
+Symbol: BTCUSDT, Edge: 0.1630
+Symbol: LTCUSDT, Edge: 0.0826
+Symbol: ATOMUSDT, Edge: 0.0029
+Symbol: LINKUSDT, Edge: 0.0400
+Symbol: ETCUSDT, Edge: -0.0745
+Symbol: UNIUSDT, Edge: 0.0326
+
+Selected Portfolio (1 assets):
+  SOLUSDT (SELL): Edge -0.3916
+
+Executing Trades...
+--> OPENING SELL SOLUSDT Size $233.21
+Placing Strategic Order for SOLUSDT. Edge: -0.3915635903767147 (Abs: 0.3915635903767147)
+Cancelled all open orders for SOLUSDT
+Placing LIMIT (Maker) for SOLUSDT: SELL 1.97 @ 118.14
+  -> Waiting up to 180s for Limit fill...
+  -> Limit not filled (NEW). Cancelling and Market Buying.
+Placing MARKET for SOLUSDT: SELL 1.97 @ ~117.92
+DB: Logged order 193408509511 for SOLUSDT.
+Entry SOLUSDT @ 117.93. ATR: 2.2657142857142865. Setting Brackets...
+  Using BAND 1 (Weak) Single TP
+  SL set at 119.63
+  TP_Full LIMIT set at 117.25 (Qty: 1.97)
+Cycle complete.
+Next 4H candle closes at 2026-01-30 04:00:00 UTC. Entering monitoring loop until 2026-01-30 04:02:00 UTC.
+
+--- Analysis cycle check at 2026-01-30 04:02:15.759620 ---
+Checking for orphan orders (dangling TP/SL)...
+No orphan orders found.
+Fetching current positions...
+Open Positions: []
+Total USDT Capital: 53.0014103
+Analyzing 15 symbols...
+Symbol: BTCUSDT, Edge: 0.0783
+Symbol: AVAXUSDT, Edge: 0.1001
+Symbol: DOGEUSDT, Edge: 0.0419
+Symbol: XRPUSDT, Edge: 0.0814
+Symbol: ETHUSDT, Edge: 0.2471Symbol: BNBUSDT, Edge: -0.1996Symbol: DOTUSDT, Edge: 0.2002
+
+
+Symbol: ADAUSDT, Edge: 0.0688
+Symbol: SOLUSDT, Edge: 0.0291
+Symbol: LTCUSDT, Edge: -0.0481
+Symbol: LINKUSDT, Edge: -0.1097
+Symbol: UNIUSDT, Edge: 0.1441
+Symbol: ATOMUSDT, Edge: 0.0157
+Symbol: ETCUSDT, Edge: 0.1235
+
+Selected Portfolio (0 assets):
+
+Executing Trades...
+Cycle complete.
+Next 4H candle closes at 2026-01-30 08:00:00 UTC. Entering monitoring loop until 2026-01-30 08:02:00 UTC.
+
+--- Analysis cycle check at 2026-01-30 08:02:03.067029 ---
+Checking for orphan orders (dangling TP/SL)...
+No orphan orders found.
+Fetching current positions...
+Open Positions: []
+Total USDT Capital: 53.0014103
+Analyzing 15 symbols...
+Symbol: DOGEUSDT, Edge: -0.0037
+Symbol: ETHUSDT, Edge: -0.1266
+Symbol: SOLUSDT, Edge: 0.0630
+Symbol: DOTUSDT, Edge: -0.0010
+Symbol: ADAUSDT, Edge: -0.0233
+Symbol: XRPUSDT, Edge: -0.0651
+Symbol: AVAXUSDT, Edge: 0.0390
+Symbol: BTCUSDT, Edge: -0.0326Symbol: BNBUSDT, Edge: -0.0706
+
+Symbol: LTCUSDT, Edge: -0.1117
+Symbol: LINKUSDT, Edge: -0.0888
+Symbol: ATOMUSDT, Edge: 0.1805
+Symbol: ETCUSDT, Edge: -0.1034
+Symbol: UNIUSDT, Edge: 0.0371
+
+Selected Portfolio (0 assets):
+
+Executing Trades...
+Cycle complete.
+Next 4H candle closes at 2026-01-30 12:00:00 UTC. Entering monitoring loop until 2026-01-30 12:02:00 UTC.
+
+--- Analysis cycle check at 2026-01-30 12:02:48.739124 ---
+Checking for orphan orders (dangling TP/SL)...
+No orphan orders found.
+Fetching current positions...
+Open Positions: []
+Total USDT Capital: 53.0014103
+Analyzing 15 symbols...
+Symbol: ETHUSDT, Edge: -0.1213
+Symbol: AVAXUSDT, Edge: 0.1837
+Symbol: BTCUSDT, Edge: 0.0374
+Symbol: BNBUSDT, Edge: 0.1065
+Symbol: SOLUSDT, Edge: 0.1799
+Symbol: DOTUSDT, Edge: -0.1798
+Symbol: XRPUSDT, Edge: 0.1757
+Symbol: DOGEUSDT, Edge: -0.0230
+Symbol: ADAUSDT, Edge: 0.2053
+Symbol: LTCUSDT, Edge: -0.0033
+Symbol: ETCUSDT, Edge: -0.1030
+Symbol: UNIUSDT, Edge: 0.2014
+Symbol: ATOMUSDT, Edge: -0.2008
+Symbol: LINKUSDT, Edge: 0.1272
+
+Selected Portfolio (0 assets):
+
+Executing Trades...
+Cycle complete.
+Next 4H candle closes at 2026-01-30 16:00:00 UTC. Entering monitoring loop until 2026-01-30 16:02:00 UTC.
+
+--- Analysis cycle check at 2026-01-30 16:02:35.705347 ---
+Checking for orphan orders (dangling TP/SL)...
+No orphan orders found.
+Fetching current positions...
+Open Positions: []
+Total USDT Capital: 53.0014103
+Analyzing 15 symbols...
+Symbol: DOGEUSDT, Edge: -0.1857
+Symbol: ADAUSDT, Edge: -0.1450
+Symbol: AVAXUSDT, Edge: 0.0779
+Symbol: BTCUSDT, Edge: 0.0075
+Symbol: DOTUSDT, Edge: 0.0483
+Symbol: ETHUSDT, Edge: 0.0726
+Symbol: BNBUSDT, Edge: -0.1242
+Symbol: SOLUSDT, Edge: -0.0086
+Symbol: XRPUSDT, Edge: 0.1238
+Symbol: LTCUSDT, Edge: 0.0666
+Symbol: LINKUSDT, Edge: 0.0834
+Symbol: ATOMUSDT, Edge: -0.1588
+Symbol: ETCUSDT, Edge: 0.1064
+Symbol: UNIUSDT, Edge: -0.0309
+
+Selected Portfolio (0 assets):
+
+Executing Trades...
+Cycle complete.
+Next 4H candle closes at 2026-01-30 20:00:00 UTC. Entering monitoring loop until 2026-01-30 20:02:00 UTC.
+
+--- Analysis cycle check at 2026-01-30 20:02:21.696873 ---
+Checking for orphan orders (dangling TP/SL)...
+No orphan orders found.
+Fetching current positions...
+Open Positions: []
+Total USDT Capital: 53.0014103
+Analyzing 15 symbols...
+Symbol: XRPUSDT, Edge: 0.0387
+Symbol: BNBUSDT, Edge: 0.0554Symbol: ETHUSDT, Edge: 0.0158
+
+Symbol: BTCUSDT, Edge: 0.1808
+Symbol: ADAUSDT, Edge: -0.1715
+Symbol: SOLUSDT, Edge: 0.0802
+Symbol: DOTUSDT, Edge: -0.1014
+Symbol: AVAXUSDT, Edge: -0.0226
+Symbol: DOGEUSDT, Edge: 0.1029
+Symbol: LTCUSDT, Edge: 0.0980
+Symbol: LINKUSDT, Edge: -0.0537
+Symbol: ETCUSDT, Edge: 0.4959
+Symbol: UNIUSDT, Edge: -0.0506
+Symbol: ATOMUSDT, Edge: 0.0735
+
+Selected Portfolio (1 assets):
+  ETCUSDT (BUY): Edge 0.4959
+
+Executing Trades...
+--> OPENING BUY ETCUSDT Size $333.91
+Placing Strategic Order for ETCUSDT. Edge: 0.4959301270877316 (Abs: 0.4959301270877316)
+Cancelled all open orders for ETCUSDT
+Placing LIMIT (Maker) for ETCUSDT: BUY 31.21 @ 10.7
+  -> Waiting up to 180s for Limit fill...
+  -> Limit not filled (NEW). Cancelling and Market Buying.
+Placing MARKET for ETCUSDT: BUY 31.21 @ ~10.72452003
+DB: Logged order 28634344151 for ETCUSDT.
+Entry ETCUSDT @ 10.709. ATR: 0.26285714285714284. Setting Brackets...
+  Using BAND 2 (Medium) Single TP
+  SL set at 10.512
+  TP_Full LIMIT set at 10.84 (Qty: 31.21)
+Cycle complete.
+Next 4H candle closes at 2026-01-31 00:00:00 UTC. Entering monitoring loop until 2026-01-31 00:02:00 UTC.
+
+--- Analysis cycle check at 2026-01-31 00:02:49.655870 ---
+Checking for orphan orders (dangling TP/SL)...
+No orphan orders found.
+Fetching current positions...
+Open Positions: ['ETCUSDT']
+Total USDT Capital: 52.80720788
+Analyzing 15 symbols...
+Symbol: AVAXUSDT, Edge: 0.2347
+Symbol: BTCUSDT, Edge: 0.1761
+Symbol: ETHUSDT, Edge: 0.0844
+Symbol: XRPUSDT, Edge: 0.0528
+Symbol: DOGEUSDT, Edge: 0.1965
+Symbol: DOTUSDT, Edge: -0.0022
+Symbol: BNBUSDT, Edge: 0.0813
+Symbol: ADAUSDT, Edge: -0.0303
+Symbol: SOLUSDT, Edge: 0.1146
+Symbol: LTCUSDT, Edge: 0.1446
+Symbol: LINKUSDT, Edge: 0.1297
+Symbol: ATOMUSDT, Edge: 0.0576
+Symbol: UNIUSDT, Edge: 0.2608
+Symbol: ETCUSDT, Edge: 0.0125
+
+Selected Portfolio (0 assets):
+
+Executing Trades...
+--> CLOSING ETCUSDT (No Edge)
+Cancelled all open orders for ETCUSDT
+Closing position for ETCUSDT: SELL 31.21
+DB: Logged order 28635719573 for ETCUSDT.
+Cycle complete.
+Next 4H candle closes at 2026-01-31 04:00:00 UTC. Entering monitoring loop until 2026-01-31 04:02:00 UTC.
+
+--- Analysis cycle check at 2026-01-31 04:02:36.257973 ---
+Checking for orphan orders (dangling TP/SL)...
+No orphan orders found.
+Fetching current positions...
+Open Positions: []
+Total USDT Capital: 48.58454273
+Analyzing 15 symbols...
+Symbol: BNBUSDT, Edge: 0.0532
+Symbol: DOGEUSDT, Edge: 0.0060
+Symbol: XRPUSDT, Edge: 0.0071
+Symbol: AVAXUSDT, Edge: 0.0469
+Symbol: BTCUSDT, Edge: 0.0411
+Symbol: ETHUSDT, Edge: 0.0817
+Symbol: SOLUSDT, Edge: -0.0733
+Symbol: DOTUSDT, Edge: 0.0393
+Symbol: ADAUSDT, Edge: 0.1378
+Symbol: LTCUSDT, Edge: -0.0047
+Symbol: LINKUSDT, Edge: 0.1142
+Symbol: ATOMUSDT, Edge: 0.0958
+Symbol: ETCUSDT, Edge: 0.1421
+Symbol: UNIUSDT, Edge: -0.0221
+
+Selected Portfolio (0 assets):
+
+Executing Trades...
+Cycle complete.
+Next 4H candle closes at 2026-01-31 08:00:00 UTC. Entering monitoring loop until 2026-01-31 08:02:00 UTC.
