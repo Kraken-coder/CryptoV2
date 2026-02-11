@@ -3,7 +3,8 @@ from env import (
     band1_lower, band1_upper, leverage_band1,
     band2_lower, band2_upper, leverage_band2,
     band3_lower, band3_upper, leverage_band3,
-    band4_lower, leverage_band4
+    band4_lower, leverage_band4,
+    positive_edge_penalty, negative_edge_penalty
 )
 
 class TradingPrice:
@@ -23,26 +24,32 @@ class TradingPrice:
         """
         Returns (side, leverage, description) based on new 4-band system
         """
-        abs_edge = abs(edge)
+        # Apply Directional Penalty
+        penalty = positive_edge_penalty if edge > 0 else negative_edge_penalty
         
-        # Determine Band
+        abs_edge = abs(edge)
+        effective_edge = abs_edge - penalty
+        if effective_edge < 0:
+            effective_edge = 0
+        
+        # Determine Band based on effective_edge
         band = 0
         leverage = 0
         desc = "No Trade"
 
-        if abs_edge >= band4_lower:
+        if effective_edge >= band4_lower:
             band = 4
             leverage = leverage_band4
             desc = "Band 4 (Extreme)"
-        elif band3_lower <= abs_edge < band3_upper:
+        elif band3_lower <= effective_edge < band3_upper:
             band = 3
             leverage = leverage_band3
             desc = "Band 3 (Strong)"
-        elif band2_lower <= abs_edge < band2_upper:
+        elif band2_lower <= effective_edge < band2_upper:
             band = 2
             leverage = leverage_band2
             desc = "Band 2 (Medium)"
-        elif band1_lower <= abs_edge < band1_upper:
+        elif band1_lower <= effective_edge < band1_upper:
             band = 1
             leverage = leverage_band1
             desc = "Band 1 (Weak)"

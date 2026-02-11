@@ -8,13 +8,13 @@ from data_ingestion import DataIngestion
 from model import Classifier
 from trading_utils import TradingPrice
 from binance.client import Client
-from env import demo_futures_api, demo_futures_secret, test_net, max_funding_rate_threshold, edge_threshold_small
+from env import demo_futures_api, demo_futures_secret, test_net, max_funding_rate_threshold, edge_threshold_small, max_open_positions
 
 # Configuration - Full List
 TRADING_SYMBOLS = [
     "BTCUSDT", "ETHUSDT", "BNBUSDT", "XRPUSDT", "ADAUSDT", 
     "SOLUSDT", "DOGEUSDT", "MATICUSDT", "DOTUSDT", "AVAXUSDT",
-    "LTCUSDT", "LINKUSDT", "ATOMUSDT", "ETCUSDT", "UNIUSDT"
+    "LTCUSDT", "LINKUSDT", "ATOMUSDT", "UNIUSDT"
 ]
 
 def get_next_candle_time():
@@ -221,15 +221,25 @@ def main():
             long_candidates.sort(key=lambda x: x['edge'], reverse=True)
             short_candidates.sort(key=lambda x: x['edge'])
             
-            # User request: Trade these 15 symbols specifically. 
-            # We treat all valid signals as portfolio candidates to avoid "rank churn".
-            # If a symbol has an edge, we trade/hold it.
-            selected_portfolio = long_candidates + short_candidates
+            # Select top N candidates based on absolute edge strength
+            eligible = [c for c in candidates if c['side'] in ('BUY', 'SELL')]
+            
+            # Sort all eligible trades by conviction (absolute edge)
+            eligible.sort(key=lambda x: abs(x['edge']), reverse=True)
+            
+            # Take the top N
+            if eligible:
+                selected_portfolio = eligible[:max_open_positions]
+            else:
+                selected_portfolio = []
+
             selected_symbols = set(c['symbol'] for c in selected_portfolio)
             
-            print(f"\nSelected Portfolio ({len(selected_portfolio)} assets):")
+            print(f"\nSelected Portfolio ({len(selected_portfolio)} assets, Limit: {max_open_positions}):")
             for c in selected_portfolio:
                 print(f"  {c['symbol']} ({c['side']}): Edge {c['edge']:.4f}")
+            if not selected_portfolio:
+                print("  (No tradable candidate found this cycle)")
 
             # Prepare Execution Plan
             final_execution_list = []

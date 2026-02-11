@@ -1,11 +1,12 @@
 from env import demo_futures_api , demo_futures_secret , test_net
 from binance.client import Client
 from env import (
+    tp_mode,
     sl_atr_multiplier,
-    band1_lower, band1_upper, tp_band1_atr,
-    band2_lower, band2_upper, tp_band2_atr,
-    band3_lower, band3_upper, tp_band3_ladder,
-    band4_lower, tp_band4_ladder
+    band1_lower, band1_upper, tp_band1_atr, tp_band1_pnl,
+    band2_lower, band2_upper, tp_band2_atr, tp_band2_pnl,
+    band3_lower, band3_upper, tp_band3_ladder, tp_band3_pnl_ladder,
+    band4_lower, tp_band4_ladder, tp_band4_pnl_ladder
 )
 from database_orm import Database
 
@@ -286,6 +287,26 @@ class TradingFunctions:
         # --- BAND CONFIGURATION LOGIC ---
         tps = [] # List of tuples (price, quantity, label)
         
+        # Helper to calc price based on Mode
+        def calc_tp_price(entry, side, multiplier_or_pnl, is_ladder=False):
+            if tp_mode == 'PNL':
+                # multiplier_or_pnl is Target ROE (e.g. 0.30 for 30%)
+                # Price Move % = Target ROE / Leverage
+                # e.g. 30% ROE at 10x lev = 3% price move
+                if leverage <= 0: return entry # Safety
+                move_pct = multiplier_or_pnl / leverage
+                if side == 'BUY':
+                    return entry * (1 + move_pct)
+                else:
+                    return entry * (1 - move_pct)
+            else:
+                # ATR Mode
+                offset = multiplier_or_pnl * atr
+                if side == 'BUY':
+                    return entry + offset
+                else:
+                    return entry - offset
+
         # Default SL price (can be overridden but logic is standard)
         if side == 'BUY':
              sl_price = entry_price - (sl_atr_multiplier * atr)
@@ -296,58 +317,67 @@ class TradingFunctions:
 
         # BAND 4: > 1.0 (Ladder)
         if abs_edge >= band4_lower:
-            print(f"  Using BAND 4 (Extreme) Ladder")
-            m1, m2, m3 = tp_band4_ladder
+            print(f"  Using BAND 4 (Extreme) Ladder [{tp_mode}]")
+            if tp_mode == 'PNL':
+                 m1, m2, m3 = tp_band4_pnl_ladder
+            else:
+                 m1, m2, m3 = tp_band4_ladder
+                 
             # Ladder Qty: 30%, 30%, 20% (remaining 20% hold)
             q1 = round(quantity * 0.30, qty_precision)
             q2 = round(quantity * 0.30, qty_precision)
             q3 = round(quantity * 0.20, qty_precision)
+            
+            p1 = calc_tp_price(entry_price, side, m1)
+            p2 = calc_tp_price(entry_price, side, m2)
+            p3 = calc_tp_price(entry_price, side, m3)
 
-            if side == 'BUY':
-                 tps.append((entry_price + m1*atr, q1, "TP1"))
-                 tps.append((entry_price + m2*atr, q2, "TP2"))
-                 tps.append((entry_price + m3*atr, q3, "TP3"))
-            else:
-                 tps.append((entry_price - m1*atr, q1, "TP1"))
-                 tps.append((entry_price - m2*atr, q2, "TP2"))
-                 tps.append((entry_price - m3*atr, q3, "TP3"))
+            tps.append((p1, q1, "TP1"))
+            tps.append((p2, q2, "TP2"))
+            tps.append((p3, q3, "TP3"))
 
         # BAND 3: 0.6 - 1.0 (Ladder)
         elif band3_lower <= abs_edge < band3_upper:
-            print(f"  Using BAND 3 (Strong) Ladder")
-            m1, m2, m3 = tp_band3_ladder
+            print(f"  Using BAND 3 (Strong) Ladder [{tp_mode}]")
+            if tp_mode == 'PNL':
+                 m1, m2, m3 = tp_band3_pnl_ladder
+            else:
+                 m1, m2, m3 = tp_band3_ladder
+
             q1 = round(quantity * 0.30, qty_precision)
             q2 = round(quantity * 0.30, qty_precision)
             q3 = round(quantity * 0.20, qty_precision)
 
-            if side == 'BUY':
-                 tps.append((entry_price + m1*atr, q1, "TP1"))
-                 tps.append((entry_price + m2*atr, q2, "TP2"))
-                 tps.append((entry_price + m3*atr, q3, "TP3"))
-            else:
-                 tps.append((entry_price - m1*atr, q1, "TP1"))
-                 tps.append((entry_price - m2*atr, q2, "TP2"))
-                 tps.append((entry_price - m3*atr, q3, "TP3"))
+            p1 = calc_tp_price(entry_price, side, m1)
+            p2 = calc_tp_price(entry_price, side, m2)
+            p3 = calc_tp_price(entry_price, side, m3)
+
+            tps.append((p1, q1, "TP1"))
+            tps.append((p2, q2, "TP2"))
+            tps.append((p3, q3, "TP3"))
                  
         # BAND 2: 0.4 - 0.6 (Single TP)
         elif band2_lower <= abs_edge < band2_upper:
-            print(f"  Using BAND 2 (Medium) Single TP")
-            m = tp_band2_atr
-            # 100% Exit
-            if side == 'BUY':
-                tps.append((entry_price + m*atr, quantity, "TP_Full"))
+            print(f"  Using BAND 2 (Medium) Single TP [{tp_mode}]")
+            if tp_mode == 'PNL':
+                 m = tp_band2_pnl
             else:
-                tps.append((entry_price - m*atr, quantity, "TP_Full"))
+                 m = tp_band2_atr
+            
+            p = calc_tp_price(entry_price, side, m)
+            tps.append((p, quantity, "TP_Full"))
 
         # BAND 1: 0.3 - 0.4 (Single TP)
         else:
             # Fallback to Band 1 logic even if < 0.3 (shouldn't happen due to entry filter)
-            print(f"  Using BAND 1 (Weak) Single TP")
-            m = tp_band1_atr
-            if side == 'BUY':
-                tps.append((entry_price + m*atr, quantity, "TP_Full"))
+            print(f"  Using BAND 1 (Weak) Single TP [{tp_mode}]")
+            if tp_mode == 'PNL':
+                 m = tp_band1_pnl
             else:
-                tps.append((entry_price - m*atr, quantity, "TP_Full"))
+                 m = tp_band1_atr
+                 
+            p = calc_tp_price(entry_price, side, m)
+            tps.append((p, quantity, "TP_Full"))
 
         # Round Prices
         sl_price = round(sl_price, price_precision)
